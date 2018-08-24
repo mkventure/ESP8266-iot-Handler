@@ -1,15 +1,5 @@
-#include "Arduino.h"
 #include "iotHandler.h"
-//#include "defs.h"
-
-#include <ESP8266WiFi.h>
-//#include <ESP8266mDNS.h>
-//#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
-#include <PubSubClient.h>
-
-WiFiClient espClient;
-PubSubClient client(espClient);
+#include "Arduino.h"
 
 #define WIFI_SETUP_INTERVAL 30000
 #define WIFI_RESTART_INTERVAL 6000000
@@ -22,26 +12,28 @@ iotHandler::iotHandler(int wifi_pin, int led_pin, const char* wifi_ssid, const c
   led_pin = led_pin;
 
   // WIFI Params
-  const char* _wifi_ssid = wifi_ssid;
-  const char* _wifi_password = wifi_password;
+  _wifi_ssid = wifi_ssid;
+  _wifi_password = wifi_password;
 
-  bool wifiState = false;
+  _wifiState = false;
 
   // MQTT PARAMS
-  const char* _mqtt_broker = mqtt_broker;
-  const char* _mqtt_clientId = mqtt_clientId;
-  const char* _mqtt_username = mqtt_username;
-  const char* _mqtt_password = mqtt_password;
-  int _mqtt_port = 1883;
+  _mqtt_broker = mqtt_broker;
+  _mqtt_clientId = mqtt_clientId;
+  _mqtt_username = mqtt_username;
+  _mqtt_password = mqtt_password;
+  _mqtt_port = 1883;
 
-  const char* _birthMessage = "online";
-  const char* _lwtMessage = "offline";
-  String _availabilityTopic = mqtt_clientId;
-  _availabilityTopic.concat("/availability");
+  _birthMessage = "online";
+  _lwtMessage = "offline";
+  _availabilityTopic = "temp/availibility"; //mqtt_clientId;
+//  _availabilityTopic.concat("/availability");
 
   // OTA PARAMS
-  String _otaName = "OTA_";
-  _otaName.concat(mqtt_clientId);
+  _otaName = "OTA_";
+//  _otaName.concat(mqtt_clientId);
+
+  client.setClient(espClient);
 
   delay(10);
 
@@ -49,13 +41,10 @@ iotHandler::iotHandler(int wifi_pin, int led_pin, const char* wifi_ssid, const c
   pinMode(wifi_pin, OUTPUT);
 
   Serial.begin(115200);
-  Serial.println("\n\nBooting...");
-
+  
   setupWiFi();
   setupOTA();
   setupMQTT();
-  client.setCallback(NULL);
-  
 
   Serial.println("Ready");
 }
@@ -65,12 +54,17 @@ iotHandler::iotHandler(int wifi_pin, int led_pin, const char* wifi_ssid, const c
  *************************************************************************/
 
 void iotHandler::setupWiFi() {
+  
+  Serial.println("\n\nBooting...");
+
+  
   WiFi.disconnect();
   Serial.println("Starting WiFi...");
+  Serial.print("Connecting to ");
+  Serial.println(_wifi_ssid);
   WiFi.mode(WIFI_STA);
   WiFi.begin(_wifi_ssid, _wifi_password);
 }
-
 
 void iotHandler::reconnectWiFi() {
   static unsigned long setupMillis = 0;
@@ -78,8 +72,6 @@ void iotHandler::reconnectWiFi() {
   const unsigned long setupInterval = WIFI_SETUP_INTERVAL;
   const unsigned long restartInterval = WIFI_RESTART_INTERVAL;
 
-  //  Serial.print("wifiFlag: ");
-  //  Serial.println(wifiState);
   if (WiFi.status() != WL_CONNECTED) {
     unsigned long currentMillis = millis();
     if (_wifiState == true) {
