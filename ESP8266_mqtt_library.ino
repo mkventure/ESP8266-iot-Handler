@@ -1,4 +1,5 @@
 #include "config.h"
+#include "module_config.h"
 #include "iotHandler.h"
 
 iotHandler iotHandler(WIFI_PIN, LED_PIN, WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER, MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD);
