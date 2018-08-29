@@ -31,8 +31,8 @@ class iotHandler
   private:
 
 
-    int wifi_pin;
-    int led_pin;
+    int _wifi_pin;
+    int _led_pin;
 
     const char* _wifi_ssid;
     const char* _wifi_password;
@@ -46,9 +46,9 @@ class iotHandler
 
     const char* _birthMessage;
     const char* _lwtMessage;
-    char* _availabilityTopic;
+    char _availabilityTopic[40];
 
-    char* _otaName;
+    char _otaName[20]; 
 
     MQTT_CALLBACK_ACTION_SIGNATURE;
     MQTT_CALLBACK_CONNECT_SIGNATURE; //variable of the callback function

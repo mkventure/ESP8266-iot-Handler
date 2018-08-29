@@ -23,7 +23,10 @@ enum Ternary fan = STATE_UNKNOWN;
 
 const char* mqtt_light_action_topic = MQTT_LIGHT_ACTION_TOPIC;
 const char* mqtt_light_status_topic = MQTT_LIGHT_STATUS_TOPIC;
-enum Ternary light = STATE_UNKNOWN;
+enum Ternary light = STATE_ON;
+
+const char* mqtt_command_action_topic = MQTT_COMMAND_ACTION_TOPIC;
+const char* invert_light = LIGHT_INVERT_PAYLOAD;
 
 #ifdef FAN_ON_DELAY
 bool onFlag = false;
@@ -34,8 +37,6 @@ unsigned long fan_onTime;
 
 void setupModule() {
   Serial.println("Starting FanControl...");
-
-
   pinMode(FAN_OFF_PIN, OUTPUT);
   pinMode(FAN_LOW_PIN, OUTPUT);
   pinMode(FAN_MED_PIN, OUTPUT);
@@ -68,9 +69,6 @@ void setupModule() {
 }
 
 void loopModule() {
-#ifdef LIGHT_SENSE_PIN
-  check_light_status();
-#endif
 #ifdef FAN_ON_DELAY
 handle_FanOnDelay();
 #endif
@@ -90,6 +88,11 @@ void onConnect() {
   Serial.print(mqtt_light_action_topic);
   Serial.println("...");
   iotHandler.client.subscribe(mqtt_light_action_topic);
+
+  Serial.print("Subscribing to ");
+  Serial.print(mqtt_command_action_topic);
+  Serial.println("...");
+  iotHandler.client.subscribe(mqtt_command_action_topic);  
 
   // Publish the current status on connect/reconnect
   publish_fan_status();
@@ -142,6 +145,9 @@ void publish_fan_status() {
     iotHandler.client.publish(mqtt_fan_status_topic, FAN_OFF_PAYLOAD, true);
     Serial.println(FAN_OFF_PAYLOAD);
   }
+  else {    
+    Serial.println("FAN STATE UNKNOWN");
+  }
 }
 
 void publish_fanSpeed_status() {
@@ -163,20 +169,24 @@ void publish_fanSpeed_status() {
 
 void toggleRelay(int pin) {
   //debug leds on while relay active
-  digitalWrite(LED_BUILTIN, true); //red light off
-  digitalWrite(2, false); //blue led on
+  digitalWrite(LED_PIN, true); //red light off
+  digitalWrite(WIFI_PIN, false); //blue led on
 #if(ACTIVE_HIGH_RELAY)
   digitalWrite(pin, HIGH);
+  Serial.print("Toggled HIGH to Pin: ");
+  Serial.println(pin);
   delay(relayActiveTime);
   digitalWrite(pin, LOW);
 #else
   digitalWrite(pin, LOW);
+  Serial.print("Toggled LOW to Pin: ");
+  Serial.println(pin);
   delay(relayActiveTime);
   digitalWrite(pin, HIGH);
 #endif
   //debug leds off
-  digitalWrite(2, true); //blue led off
-  digitalWrite(LED_BUILTIN, false);
+  digitalWrite(WIFI_PIN, true); //blue led off
+  digitalWrite(LED_PIN, false);
 }
 
 
@@ -222,7 +232,7 @@ void triggerAction(String topic, String payload) {
     publish_fanSpeed_status();
     publish_fan_status();
     onFlag = false;
-  }
+  }  
   else if (topic == mqtt_fanspeed_action_topic && payload == FAN_MED_PAYLOAD && currentTime - fan_lastActionTime >= actionTime) {
     fan_lastActionTime = currentTime;
     fanSpeed = FAN_MED;
@@ -253,6 +263,15 @@ void triggerAction(String topic, String payload) {
     light_lastActionTime = currentTime;
     toggleRelay(LIGHT_OFF_PIN);
     light = STATE_OFF;
+    publish_light_status();
+  }
+  else if (topic == mqtt_command_action_topic && payload == invert_light) {
+    if(light == STATE_OFF) {
+      light = STATE_ON;
+    }
+    else {
+      light = STATE_OFF;      
+    }
     publish_light_status();
   }
   else {

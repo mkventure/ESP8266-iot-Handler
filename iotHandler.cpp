@@ -6,10 +6,16 @@
 #define MQTT_RECONNECT_INTERVAL 10000
 #define HEARTBEAT 250
 
+#define AVAILABLE_PAYLOAD "ONLINE"
+#define UNAVAILABLE_PAYLOAD "OFFLINE"
+
+#define MQTT_AVAILIBILITY_TOPIC_SUFFIX "/AVAILIBILITY"
+#define OTA_HOSTNAME_PREFIX "OTA_"
+
 iotHandler::iotHandler(int wifi_pin, int led_pin, const char* wifi_ssid, const char* wifi_password, const char* mqtt_broker, const char* mqtt_clientId, const char* mqtt_username, const char* mqtt_password)
 {
-  wifi_pin = wifi_pin;
-  led_pin = led_pin;
+  _wifi_pin = wifi_pin;
+  _led_pin = led_pin;
 
   // WIFI Params
   _wifi_ssid = wifi_ssid;
@@ -24,21 +30,24 @@ iotHandler::iotHandler(int wifi_pin, int led_pin, const char* wifi_ssid, const c
   _mqtt_password = mqtt_password;
   _mqtt_port = 1883;
 
-  _birthMessage = "online";
-  _lwtMessage = "offline";
-  _availabilityTopic = "temp/availibility"; //mqtt_clientId;
-//  _availabilityTopic.concat("/availability");
+  _birthMessage = AVAILABLE_PAYLOAD;
+  _lwtMessage = UNAVAILABLE_PAYLOAD;
+
+  const char *availibility_suffix = MQTT_AVAILIBILITY_TOPIC_SUFFIX;
+  strcpy(_availabilityTopic, mqtt_clientId);
+  strcat(_availabilityTopic, availibility_suffix);
 
   // OTA PARAMS
-  _otaName = "OTA_";
-//  _otaName.concat(mqtt_clientId);
+  const char *ota_prefix = OTA_HOSTNAME_PREFIX;
+  strcpy(_otaName, ota_prefix);
+  strcat(_otaName, mqtt_clientId);
 
   client.setClient(espClient);
 
   delay(10);
 
-  pinMode(led_pin, OUTPUT);
-  pinMode(wifi_pin, OUTPUT);
+  pinMode(_led_pin, OUTPUT);
+  pinMode(_wifi_pin, OUTPUT);
 
   Serial.begin(115200);
   
@@ -123,9 +132,10 @@ void iotHandler::reconnectMQTT() {
 
   if (currentMillis - reconnectMillis >= reconnectInterval) {
     reconnectMillis = currentMillis;
-    digitalWrite(wifi_pin, false);
+    digitalWrite(_wifi_pin, false);
     Serial.print("Attempting MQTT connection...");
     if (client.connect(_mqtt_clientId, _mqtt_username, _mqtt_password, _availabilityTopic, 0, true, _lwtMessage)) {
+      Serial.print("\n");
       publish_birth_message();
       callbackConnect(); 
     }
@@ -256,21 +266,21 @@ void iotHandler::heartBeat(bool wifi, bool mqtt) {
   //  Serial.println(hbMode);
   if (!wifi && hbMode != 1) {
     Serial.println("HeartBeatMode Changed: Waiting for Wifi...");
-    digitalWrite(led_pin, LOW); // switches the redLED on
+    digitalWrite(_led_pin, LOW); // switches the redLED on
     ledState = LOW;
     previousMillis = currentMillis - interval;
     hbMode = 1;
   }
   else if (!mqtt && wifi && hbMode != 2) {
     Serial.println("HeartBeatMode Changed: Waiting for MQTT...");
-    digitalWrite(led_pin, HIGH); // switches the LED off
+    digitalWrite(_led_pin, HIGH); // switches the LED off
     ledState = LOW;
     hbMode = 2;
     previousMillis = currentMillis - interval;
   }
   else if (wifi && mqtt && hbMode != 0) {
     Serial.println("HeartBeatMode Changed: Running!");
-    digitalWrite(wifi_pin, HIGH);
+    digitalWrite(_wifi_pin, HIGH);
     ledState = LOW;
     hbMode = 0;
     previousMillis = currentMillis - interval;
@@ -279,10 +289,10 @@ void iotHandler::heartBeat(bool wifi, bool mqtt) {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     if (hbMode == 0) {
-      digitalWrite(led_pin, ledState);
+      digitalWrite(_led_pin, ledState);
     }
     else {
-      digitalWrite(wifi_pin, ledState);
+      digitalWrite(_wifi_pin, ledState);
     }
     ledState = !ledState;
   }
