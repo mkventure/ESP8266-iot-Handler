@@ -1,6 +1,3 @@
 secrets.h
-module.ino
-ESP8266_mqtt.ino
-module_config.h
 .gitignore
 .gitattributes
