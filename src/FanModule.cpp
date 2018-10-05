@@ -43,7 +43,7 @@ FanModule::FanModule(IotHandler* handler, int fan_off_pin, int fan_low_pin, int 
   // Set output pins LOW with an active-high relay
 
   //Set fan to known off state
-  toggleRelay(fan_off_pin);
+  _toggleRelay(fan_off_pin);
   _fan = STATE_OFF;
   _fanSpeed = FAN_MED;
   publish_fanSpeed_status();
@@ -79,13 +79,13 @@ bool FanModule::triggerAction(String topic, String payload) {
     else {
       _fan = STATE_ON;
       if (_fanSpeed == FAN_HIGH) {
-        toggleRelay(_fan_high_pin);
+        _toggleRelay(_fan_high_pin);
       }
       else if (_fanSpeed == FAN_MED) {
-        toggleRelay(_fan_med_pin);
+        _toggleRelay(_fan_med_pin);
       }
       else if (_fanSpeed == FAN_LOW) {
-        toggleRelay(_fan_low_pin);
+        _toggleRelay(_fan_low_pin);
       }
       publish_fan_status();
       publish_fanSpeed_status();
@@ -93,7 +93,7 @@ bool FanModule::triggerAction(String topic, String payload) {
   }
   else if (topic == _mqtt_fan_action_topic && payload == FAN_OFF_PAYLOAD && currentTime - fan_lastActionTime >= _actionTime) {
     fan_lastActionTime = currentTime;
-    toggleRelay(_fan_off_pin);
+    _toggleRelay(_fan_off_pin);
     _fan = STATE_OFF;
     publish_fan_status();
     _onFlag = false;
@@ -102,7 +102,7 @@ bool FanModule::triggerAction(String topic, String payload) {
     fan_lastActionTime = currentTime;
     _fanSpeed = FAN_HIGH;
     if (_fan == STATE_ON) {
-      toggleRelay(_fan_high_pin);
+      _toggleRelay(_fan_high_pin);
     }
     publish_fanSpeed_status();
     publish_fan_status();
@@ -112,7 +112,7 @@ bool FanModule::triggerAction(String topic, String payload) {
     fan_lastActionTime = currentTime;
     _fanSpeed = FAN_MED;
     if (_fan == STATE_ON) {
-      toggleRelay(_fan_med_pin);
+      _toggleRelay(_fan_med_pin);
     }
     publish_fanSpeed_status();
     publish_fan_status();
@@ -122,7 +122,7 @@ bool FanModule::triggerAction(String topic, String payload) {
     fan_lastActionTime = currentTime;
     _fanSpeed = FAN_LOW;
     if (_fan == STATE_ON) {
-      toggleRelay(_fan_low_pin);
+      _toggleRelay(_fan_low_pin);
     }
     publish_fanSpeed_status();
     publish_fan_status();
@@ -142,13 +142,13 @@ void FanModule::handle_FanOnDelay() {
     _onFlag = false;
     _fan = STATE_ON;
     if (_fanSpeed == FAN_HIGH) {
-      toggleRelay(_fan_high_pin);
+      _toggleRelay(_fan_high_pin);
     }
     else if (_fanSpeed == FAN_MED) {
-      toggleRelay(_fan_med_pin);
+      _toggleRelay(_fan_med_pin);
     }
     else if (_fanSpeed == FAN_LOW) {
-      toggleRelay(_fan_low_pin);
+      _toggleRelay(_fan_low_pin);
     }
     Serial.print("Delayed On... ");
     publish_fan_status();
@@ -187,7 +187,7 @@ void FanModule::publish_fanSpeed_status() {
   }
 }
 
-void FanModule::toggleRelay(int pin) {
+void FanModule::_toggleRelay(int pin) {
   //debug leds on while relay active
   digitalWrite(handler->led_pin, true); //red light off
   digitalWrite(handler->wifi_pin, false); //blue led on

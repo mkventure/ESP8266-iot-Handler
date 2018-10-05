@@ -41,7 +41,7 @@ class FanModule
     void handle_FanOnDelay();
     void publish_fan_status();
     void publish_fanSpeed_status();
-    void toggleRelay(int pin);
+    void _toggleRelay(int pin);
 
     IotHandler* handler;
 
