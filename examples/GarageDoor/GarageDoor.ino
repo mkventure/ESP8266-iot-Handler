@@ -1,12 +1,12 @@
 #include "config.h"
 
 #include "IotHandler.h"
-#include "CoverModule.h"
+#include "Cover.h"
 #include "BinarySensor.h"
 
 IotHandler handler(WIFI_PIN, LED_PIN, WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER, MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD);
-BinarySensor reedSwitch(&handler, REED_SWITCH_PIN);
-CoverModule garage(&handler, [] {return reedSwitch.getState();}, TOGGLE_PIN);
+BinarySensor_Pin reedSwitch(&handler, REED_SWITCH_PIN);
+Cover garage(&handler, TOGGLE_PIN, [] {return reedSwitch.getState();});
 
 void setup() {
   Serial.println("Start Setup");
@@ -44,6 +44,5 @@ void onConnect() {
   reedSwitch.onConnect();
   garage.onConnect();
 }
-
 
 

@@ -1,12 +1,12 @@
 #include "config.h"
 
 #include "IotHandler.h"
-#include "FanModule.h"
-#include "LightModule.h"
+#include "Fan.h"
+#include "Light.h"
 
 IotHandler handler(WIFI_PIN, LED_PIN, WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER, MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD);
-FanModule fan(&handler, FAN_OFF_PIN, FAN_LOW_PIN, FAN_MED_PIN, FAN_HIGH_PIN);
-LightModule light(&handler, LIGHT_PIN);
+Fan fan(&handler, FAN_OFF_PIN, FAN_LOW_PIN, FAN_MED_PIN, FAN_HIGH_PIN);
+BinaryRelayLight light(&handler, LIGHT_PIN);
 
 void setup() {
   handler.set_onAction_callback(onAction);
@@ -43,5 +43,3 @@ void onConnect() {
   fan.onConnect();
   light.onConnect();
 }
-
-
