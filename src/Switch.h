@@ -12,7 +12,7 @@
 class BinarySwitch: public ActionModule
 {
   public:
-    BinarySwitch(IotHandler*, int, const char* modName = MQTT_SWITCH_NAME, bool state = false);
+    BinarySwitch(IotHandler*, const char* modName = MQTT_SWITCH_NAME, bool state = false);
 
     void onConnect();                                 //redefine onConnect
     bool triggerAction(String topic, String payload); //redefine triggerAction
@@ -21,11 +21,8 @@ class BinarySwitch: public ActionModule
     bool setStateFor(bool, unsigned long);
 
   protected:
-    void _setupPins(int, bool);
     void _publishStatus();
-    bool _isToggleSwitch();
-
-    int _switch_pin;
+    
     bool _timerFlag = false;
     unsigned long _timer;
 
@@ -35,5 +32,18 @@ class BinarySwitch: public ActionModule
     const char* _mqtt_switch_off_payload = SWITCH_OFF_PAYLOAD;
 };
 
+
+class BinarySwitch_Pin: public BinarySwitch
+{
+  public:
+    BinarySwitch_Pin(IotHandler*, int, const char* modName = MQTT_SWITCH_NAME, bool state = false);
+    bool setState(bool);
+    bool setStateFor(bool, unsigned long);
+    
+  protected:
+    void _setupPins(int);
+
+    int _switch_pin;
+};
 
 #endif
