@@ -2,54 +2,55 @@
 #ifndef BinarySensor_h
 #define BinarySensor_h
 
-#include "IotHandler.h"
+#include "Module.h"
 
-#define INVERT_SENSOR_STATE false
-#define ACTION_TIME 0
 #define DEBOUNCE_TIME 500
 
-#define MQTT_BINARYSENSOR_STATUS_TOPIC_SUFFIX "/BINARYSENSOR/STATE"
-#define MQTT_BINARYSENSOR_COMMAND_TOPIC_SUFFIX "/BINARYSENSOR/COMMAND"
+#define MQTT_BINARYSENSOR_NAME "BINARYSENSOR"
+//#define MQTT_BINARYSENSOR_COMMAND_TOPIC_SUFFIX "BINARYSENSOR"
 
 #define BINARYSENSOR_READ_PAYLOAD "BINARYSENSOR_READ"
 #define BINARYSENSOR_ON_PAYLOAD "BINARYSENSOR_ON"
 #define BINARYSENSOR_OFF_PAYLOAD "BINARYSENSOR_OFF"
 
-class BinarySensor
+//Driven Binary Sensor implements MQTT protocols for communication but state is driven externally by program functions
+class BinarySensor : public Module
 {
   public:
-    BinarySensor(IotHandler*, int);
+    BinarySensor(IotHandler*, const char* modName = MQTT_BINARYSENSOR_NAME);
 
-    void onConnect();
-
-    void loop();
-    bool getState();
-    bool getStateChange();
-    bool triggerAction(String topic, String payload);
-
-  private:
-    void _setupPins(int);
-    void _setupHandler(IotHandler*);
-    void _publish_sensor_status();
-
-    bool _sensor_read();
-
-    IotHandler* handler;
-
-    int _sensor_pin;
-    bool _sensor_state;
-    bool _sensor_change;
+    void onConnect(); //redefine onConnect
+    bool triggerAction(String topic, String payload); //redefine triggerAction 
     
-    const int _debounceTime = DEBOUNCE_TIME;
-    const int _actionTime = ACTION_TIME;
+    bool setState(bool);
+    bool getState();
+    unsigned long getChangeTime();
 
-    char _mqtt_binarysensor_status_topic[40];
-    char _mqtt_binarysensor_command_topic[40];
+  protected:
+    void _publishStatus();
+    
+    unsigned long _changeTime;
+    bool _sensorState;
     const char* _mqtt_binarysensor_read_payload = BINARYSENSOR_READ_PAYLOAD;
     const char* _mqtt_binarysensor_on_payload = BINARYSENSOR_ON_PAYLOAD;
-    const char* _mqtt_binarysensor_off_payload = BINARYSENSOR_OFF_PAYLOAD;
+    const char* _mqtt_binarysensor_off_payload = BINARYSENSOR_OFF_PAYLOAD;    
 };
 
+//Pin Binary Sensor implements MQTT protocols for communcation and state is driven internally by a specific hardware pin state
+class BinarySensor_Pin : public BinarySensor
+{
+  public:
+    BinarySensor_Pin(IotHandler*, int, const char* modName = MQTT_BINARYSENSOR_NAME, int debounceTime = DEBOUNCE_TIME);
+    bool getStateChange();
+    void loop(); //redefine loop to read sensor on each loop.
+
+  protected:
+    void _setupPins(int);    
+    bool _sensorRead();
+
+    bool _sensorChange = false;
+    int _sensorPin;
+    int _debounceTime;
+};
 
 #endif
-
