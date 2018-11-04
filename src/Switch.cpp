@@ -12,7 +12,7 @@ void BinarySwitch::onConnect() {                                 //redefine onCo
 }
 
 void BinarySwitch::loop() {
-ActionModule: loop();
+ActionModule::loop();
   if (_timerFlag && millis() >= _timer) {
     setState(!_switchState);
   }
@@ -31,7 +31,11 @@ bool BinarySwitch::triggerAction(String topic, String payload) { //redefine trig
   return true;
 }
 
-bool BinarySwitch::setState(bool state) {
+bool BinarySwitch::getState() {
+  return _switchState;
+}
+
+bool BinarySwitch::setState(bool state) {	
   if (_switchState != state) {
     _timerFlag = false;
     _switchState = state;
@@ -43,10 +47,9 @@ bool BinarySwitch::setState(bool state) {
 
 bool BinarySwitch::setStateFor(bool state, unsigned long timer) {
   if (_switchState != state) {
-    _timerFlag = true;
-    _switchState = state;
     _timer = millis() + timer;
-    _publishStatus();
+    setState(state);
+    _timerFlag = true;
     return true;
   }
   return false;
@@ -82,10 +85,3 @@ bool BinarySwitch_Pin::setState(bool state) {
     digitalWrite(_switch_pin, _switchState);
   }
 }
-
-bool BinarySwitch_Pin::setStateFor(bool state, unsigned long timer) {
-  if (BinarySwitch::setStateFor(state, timer)) {
-    digitalWrite(_switch_pin, _switchState);
-  }
-}
-
