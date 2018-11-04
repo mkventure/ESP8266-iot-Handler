@@ -36,13 +36,11 @@ void printLL(uint64_t n, uint8_t base)
     Serial.print((char)'0');
     return;
   }
-
   while (n > 0)
   {
     buf[i++] = n % base;
     n /= base;
   }
-
   for (; i > 0; i--)
     Serial.print((char) (buf[i - 1] < 10 ?
                          '0' + buf[i - 1] :
@@ -50,34 +48,17 @@ void printLL(uint64_t n, uint8_t base)
 }
 
 IRReceiver::IRReceiver(IotHandler* handler, int pin, const char* modName, bool enableRecv)
-  : ActionModule(handler, modName), irrecv(pin)
+  : BinarySwitch(handler, modName, enableRecv), irrecv(pin)
 {
-  _receiverEnabled = enableRecv;
-  enableReceiver(_receiverEnabled);
-}
-
-bool IRReceiver::triggerAction(String topic, String payload) {
-  if (topic == _mqtt_action_topic && payload == _mqtt_receive_on_payload) {
-    enableReceiver(true);
-  }
-  else if (topic == _mqtt_action_topic && payload == _mqtt_receive_off_payload) {
-    enableReceiver(false);
-  }
-  else if (topic == _mqtt_action_topic && payload == _mqtt_receive5min_payload) {
-    setStateFor(true);
+  if (getState()) {
+    irrecv.enableIRIn();
   }
   else {
-    return false;
+    irrecv.disableIRIn();
   }
-  return true;
 }
 
-void IRReceiver::onConnect() {
-  ActionModule::onConnect();
-  _publishStatus();
-}
-
-void IRReceiver::_publishResult() {
+void IRReceiver::_publish_IR() {
   String r = _commandPrint(&_results);
   Serial.print("Publishing IR Recv Command: ");
   Serial.print(_mqtt_status_topic);
@@ -87,20 +68,23 @@ void IRReceiver::_publishResult() {
 }
 
 void IRReceiver::loop() {
-  if (_receiverEnabled && irrecv.decode(&_results)) {
+  BinarySwitch:: loop();
+  if (getState() && irrecv.decode(&_results)) {
     //filter out 'unknown' IR reads, these are most likely garbage. And filter out the repeats.
     if (_results.decode_type > 0 && resultToHexidecimal(&_results) != "FFFFFFFFFFFFFFFF" ) {
       //    Serial.println(resultToHumanReadableBasic(&_results));
-      _publishResult();
+      _publish_IR();
     }
     irrecv.resume();  // Receive the next value
   }
+}
 
-  if (_timerFlag && millis() >= _timer) {
-    enableReceiver(false);
-    Serial.println("Loop turned off receiver");
-  }
-
+void IRReceiver::onConnect() {
+  //do not call parent functions. Do not need to listen to /command
+  Serial.print("Subscribing to ");
+  Serial.print(_mqtt_action_topic);
+  Serial.println("...");
+  handler->client.subscribe(_mqtt_action_topic);
 }
 
 String IRReceiver::_commandPrint(const decode_results *results) {
@@ -116,24 +100,18 @@ String IRReceiver::_commandPrint(const decode_results *results) {
   return output;
 }
 
-void IRReceiver::enableReceiver(bool state) {
-  _receiverEnabled = state;
-  _timerFlag = false;
-  if (_receiverEnabled) {
-    irrecv.enableIRIn();
+bool IRReceiver::setState(bool state) {
+  if (BinarySwitch::setState(state)) {
+    if (getState()) {
+      irrecv.enableIRIn();
+    }
+    else {
+      irrecv.disableIRIn();
+    }
+    return true;
   }
-  else {
-    irrecv.disableIRIn();
-  }
-  _publishStatus();
+  return false;
 }
-
-void IRReceiver::setStateFor(bool state, unsigned long timer) {
-  enableReceiver(state);
-  _timerFlag = true;
-  _timer = millis() + timer;
-}
-
 
 /******************************************
 
@@ -145,28 +123,17 @@ IRTransmitter::IRTransmitter(IotHandler* handler, int pin, const char* modName)
   irsend.begin();
 }
 
-void IRTransmitter::loop() {
-
-}
-
-void IRTransmitter::onConnect() {
-  ActionModule::onConnect();
-  //  _publishStatus();
-}
-
 void IRTransmitter::_publishStatus() {
   String s = "Command Parse Success: ";
   s += _lastCommand;
   s += "  ";
   s += _lastCommand;
   handler->client.publish(_mqtt_status_topic, s.c_str(), true);
-  Serial.printf("Parse Successful: %X transmitted to %s\n", _lastCommandSuccess, _mqtt_status_topic);
+  Serial.printf("Parse Successful?: %X; Transmitted %s to %s\n", _lastCommandSuccess, _lastCommand.c_str(), _mqtt_status_topic);
 }
 
 bool IRTransmitter::triggerAction(String topic, String payload) {
   if (topic == _mqtt_action_topic && payload) {
-    //    Serial.print("Command Received and Parsed: \t");
-    //    Serial.printf("Parse Successful: % X", );
     _lastCommandSuccess = parseActionSignal(payload);
     _lastCommand = payload;
     _publishStatus();

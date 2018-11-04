@@ -17,7 +17,8 @@ class BinarySwitch: public ActionModule
     void onConnect();                                 //redefine onConnect
     bool triggerAction(String topic, String payload); //redefine triggerAction
     void loop();                                      //redefine loop
-    bool setState(bool);
+	bool getState();
+    virtual bool setState(bool);
     bool setStateFor(bool, unsigned long);
 
   protected:
@@ -37,8 +38,7 @@ class BinarySwitch_Pin: public BinarySwitch
 {
   public:
     BinarySwitch_Pin(IotHandler*, int, const char* modName = MQTT_SWITCH_NAME, bool state = false);
-    bool setState(bool);
-    bool setStateFor(bool, unsigned long);
+    bool setState(bool) override;
     
   protected:
     void _setupPins(int);

@@ -3,8 +3,9 @@
 #define IRTransceiver_h
 
 #include "Module.h"
+#include "Switch.h"
 
-//#define ARDUINO ARDUINO  
+//#define ARDUINO ARDUINO
 #include <IRremoteESP8266.h>
 #include <IRrecv.h>
 #include <IRsend.h>
@@ -13,58 +14,40 @@
 #define MQTT_TRANSMITTER_NAME "IR_TRANSMITTER"
 #define MQTT_RECEIVER_NAME "IR_RECEIVER"
 
-#define MQTT_RECEIVER_ON "RECEIVE_ON"
-#define MQTT_RECEIVER_OFF "RECEIVE_OFF"
-#define MQTT_RECEIVER_5MIN "RECEIVE_5MIN"
-
-class IRReceiver: public ActionModule
+class IRReceiver: public BinarySwitch
 {
   public:
     IRReceiver(IotHandler*, int, const char* modName = MQTT_RECEIVER_NAME, bool enableRecv = false);
 
-    void onConnect();                                 //redefine onConnect
-    bool triggerAction(String topic, String payload); //redefine triggerAction
     void loop();                                      //redefine loop
-    void enableReceiver(bool);
-    void setStateFor(bool state = true, unsigned long timer = 30000); //default 5 minutes
+    void onConnect();                                 //redefine onconnect and don't call parent
+    bool setState(bool) override;
 
   protected:
-
     IRrecv irrecv;
     decode_results _results;
 
-    void _publishResult();
+    void _publish_IR();
     void _fullprint();
     String _commandPrint(const decode_results *results);
-
-    bool _receiverEnabled;
-    bool _timerFlag;
-    unsigned long _timer;
-    //    static unsigned long fiveMin = 30000;
-
-    const char* _mqtt_receive_on_payload = MQTT_RECEIVER_ON;
-    const char* _mqtt_receive_off_payload = MQTT_RECEIVER_OFF;
-    const char* _mqtt_receive5min_payload = MQTT_RECEIVER_5MIN;
 };
 
 class IRTransmitter: public ActionModule
 {
-public:
-  IRTransmitter(IotHandler*, int, const char* modName = MQTT_TRANSMITTER_NAME);
+  public:
+    IRTransmitter(IotHandler*, int, const char* modName = MQTT_TRANSMITTER_NAME);
 
-  void onConnect();                                 //redefine onConnect
-  bool triggerAction(String topic, String payload); //redefine triggerAction
-  void loop();                                      //redefine loop
+    bool triggerAction(String topic, String payload); //redefine triggerAction
 
-protected:
-  IRsend irsend;
+  protected:
+    IRsend irsend;
 
-String _lastCommand = "N/A";
-bool _lastCommandSuccess = false;
-  
-  void _publishStatus();                                 //redefine publish status
-  bool parseActionSignal(String payload);
-  bool sendIRCode(int const ir_type, uint64_t const code, char const * code_str, uint16_t bits, uint16_t repeat);
+    String _lastCommand = "N/A";
+    bool _lastCommandSuccess = false;
+
+    void _publishStatus();                                 //redefine publish status
+    bool parseActionSignal(String payload);
+    bool sendIRCode(int const ir_type, uint64_t const code, char const * code_str, uint16_t bits, uint16_t repeat);
 };
 
 /*
