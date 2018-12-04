@@ -5,7 +5,7 @@
 #define Module_h
 
 #define ACTIVE_HIGH_RELAY true
-#define RELAY_ACTIVE_TIME 500
+#define RELAY_ACTIVE_TIME 250
 
 #define MQTT_ACTION_TOPIC_SUFFIX "SET"
 #define MQTT_STATUS_TOPIC_SUFFIX "STATE"
