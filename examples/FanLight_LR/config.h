@@ -19,5 +19,3 @@
 #define FAN_MED_PIN 12
 #define FAN_HIGH_PIN 16
 #define LIGHT_PIN 13
-
-#define PIR_PIN 4
