@@ -1,87 +1,41 @@
 #include "Switch.h"
 
-BinarySwitch::BinarySwitch(IotHandler* handler, const char* modName, bool state)
-  : ActionModule(handler, modName)
+
+Switch::Switch(IotHandler* handler, const char* mqtt_object_id, const char* mqtt_component)
+  : ActionModule(handler, mqtt_object_id, mqtt_component)
 {
-  _switchState = state;
 }
 
-void BinarySwitch::onConnect() {                                 //redefine onConnect
-  ActionModule::onConnect();
-  _publishStatus();
-}
+bool Switch::_handleAction(String topic, String payload) { //redefine triggerAction
+  bool flag = ActionModule::_handleAction(topic, payload);
 
-void BinarySwitch::loop() {
-ActionModule::loop();
-  if (_timerFlag && millis() >= _timer) {
-    setState(!_switchState);
-  }
-}
-
-bool BinarySwitch::triggerAction(String topic, String payload) { //redefine triggerAction
-  if (topic == _mqtt_action_topic && payload == _mqtt_switch_on_payload && _switchState != true) {
+  if (topic == _mqtt_command_topic && payload == _mqtt_state_on_payload && getState() != true) {
     setState(true);
+    flag = true;
   }
-  else if (topic == _mqtt_action_topic && payload == _mqtt_switch_off_payload && _switchState != false) {
+  else if (topic == _mqtt_command_topic && payload == _mqtt_state_off_payload && getState() != false) {
     setState(false);
+    flag = true;
+  }
+  return flag;
+}
+
+void Switch::_publishStatus() {
+  if (getState()) {
+    Serial.printf("Publishing Switch State: %s to %s\n", _mqtt_state_on_payload, _mqtt_status_topic);
+    getClient().publish(_mqtt_status_topic, _mqtt_state_on_payload, true);
   }
   else {
-    return false;
+    Serial.printf("Publishing Switch State: %s to %s\n", _mqtt_state_off_payload, _mqtt_status_topic);
+    getClient().publish(_mqtt_status_topic, _mqtt_state_off_payload, true);
   }
-  return true;
 }
 
-bool BinarySwitch::getState() {
-  return _switchState;
-}
 
-bool BinarySwitch::setState(bool state) {	
-  if (_switchState != state) {
-    _timerFlag = false;
-    _switchState = state;
+bool Switch_Pin::setState(bool state) {
+  if (switchPin.setState(state)) {
     _publishStatus();
     return true;
   }
   return false;
-}
-
-bool BinarySwitch::setStateFor(bool state, unsigned long timer) {
-  if (_switchState != state) {
-    _timer = millis() + timer;
-    setState(state);
-    _timerFlag = true;
-    return true;
-  }
-  return false;
-}
-
-void BinarySwitch::_publishStatus() {
-  Serial.print("Publishing Switch State: ");
-  if (_switchState) {
-    handler->client.publish(_mqtt_status_topic, _mqtt_switch_on_payload, true);
-    Serial.println(_mqtt_switch_on_payload);
-  }
-  else {
-    handler->client.publish(_mqtt_status_topic, _mqtt_switch_off_payload, true);
-    Serial.println(_mqtt_switch_off_payload);
-  }
-}
-
-BinarySwitch_Pin::BinarySwitch_Pin(IotHandler* handler, int switch_pin, const char* modName, bool state)
-  : BinarySwitch(handler, modName, state)
-{
-  _setupPins(switch_pin);
-}
-
-void BinarySwitch_Pin::_setupPins(int pin) {
-  _switch_pin = pin;
-  pinMode(_switch_pin, OUTPUT);
-  digitalWrite(_switch_pin, _switchState);
-}
-
-
-bool BinarySwitch_Pin::setState(bool state) {
-  if (BinarySwitch::setState(state)) {
-    digitalWrite(_switch_pin, _switchState);
-  }
 }

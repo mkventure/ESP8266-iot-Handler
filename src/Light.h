@@ -1,39 +1,89 @@
-#include "Arduino.h"
 #ifndef LightModule_h
 #define LightModule_h
 
-#include "Module.h"
+#include "IotHandler.h"
+#include "SwitchInterface.h"
+#include "Arduino.h"
 
-#define MQTT_LIGHT_NAME "LIGHT"
+#define STATE_ON_PAYLOAD "ON"
+#define STATE_OFF_PAYLOAD "OFF"
+#define STATE_INVERT_PAYLOAD "INVERT"
 
-#define LIGHT_ON_PAYLOAD "LIGHT_ON"
-#define LIGHT_OFF_PAYLOAD "LIGHT_OFF"
-#define LIGHT_INVERT_PAYLOAD "INVERT_LIGHT"
-
-class BinaryRelayLight: public ToggleRelayModule
+class BinaryLight : public ActionModule
 {
   public:
-    BinaryRelayLight(IotHandler*, int, bool activeHighRelay = ACTIVE_HIGH_RELAY, long relayActiveTime = RELAY_ACTIVE_TIME, const char* modName = MQTT_LIGHT_NAME);
-    BinaryRelayLight(IotHandler*, int, int, bool activeHighRelay = ACTIVE_HIGH_RELAY, long relayActiveTime = RELAY_ACTIVE_TIME, const char* modName = MQTT_LIGHT_NAME);
+    BinaryLight(IotHandler*, const char*, const char* = "light");
+    BinaryLight(IotHandler*, const char*, bool, const char* = "light");
 
-    void onConnect();                                 //redefine onConnect
-    bool triggerAction(String topic, String payload); //redefine triggerAction 
-//    void loop();                                      //redefine loop
-    
+    bool getState() {
+      return _lightState;
+    }
+    bool setState(bool);
+
   protected:
-    void _setupPins(int, int);  
-    void _publishStatus();
-    bool _isToggleLight();
+    virtual bool _handleAction(String topic, String payload);
+    virtual void _publishStatus();
 
-    int _light_off_pin;
-    int _light_on_pin;
+    //    virtual void _onConnect();
+    //    virtual void _setup();
+    //    virtual void _loop() {};
 
+    virtual bool setHWState(bool) = 0;
+
+  private:
     bool _lightState;
-        
-    const char* _mqtt_light_on_payload = LIGHT_ON_PAYLOAD;    
-    const char* _mqtt_light_off_payload = LIGHT_OFF_PAYLOAD; 
-    const char* _mqtt_light_invert_payload = LIGHT_INVERT_PAYLOAD;
+
+    const char* _mqtt_state_on_payload = STATE_ON_PAYLOAD;
+    const char* _mqtt_state_off_payload = STATE_OFF_PAYLOAD;
 };
 
+class BinaryLight_TogglePin : BinaryLight
+{
+  public:
+    BinaryLight_TogglePin(IotHandler*, const char*, int pin, bool initital, bool state, unsigned long toggle_time = TOGGLE_TIME, const char* = "light");
+    BinaryLight_TogglePin(IotHandler*, const char*, int pin, bool initital, const char* = "light");
+    //    bool setState(bool);
+
+  protected:
+    virtual bool _handleAction(String topic, String payload);
+    //    virtual void _onConnect();
+    //    virtual void _setup();
+    void _loop() {
+      //      BinaryLight::_loop();
+      lightControl.switch_loop();
+    }
+    bool setHWState(bool);
+  private:
+    ToggleInterface_Pin lightControl;
+    const char* _mqtt_state_invert_payload = STATE_INVERT_PAYLOAD;
+
+};
+
+class BriLight : public BinaryLight
+{
+  public:
+    BriLight(IotHandler*, const char*, const char* = "light");
+    byte getBri() {
+      return _bri;
+    }
+    virtual bool setBri(byte) = 0;
+
+  protected:
+    virtual bool _handleAction(String topic, String payload);
+    virtual void _onConnect();
+    virtual void _setup();
+    virtual void _loop();
+
+    virtual void _publishStatus();
+
+  private:
+    byte _bri = 0;
+
+    char _mqtt_bri_command_topic[_MQTT_TOPIC_SIZE];
+    char _mqtt_bri_status_topic[_MQTT_TOPIC_SIZE];
+};
+
+class RGBLight : public BriLight {};
 
 #endif
+

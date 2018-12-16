@@ -1,129 +1,76 @@
 #include "Fan.h"
 
-Fan::Fan(IotHandler* handler, int offPin, int lowPin, int medPin, int highPin, bool activeHighRelay, long relayActiveTime, const char* modName, const char* speedName)
-  : ToggleRelayModule(handler, modName, activeHighRelay, relayActiveTime)
+
+Fan::Fan(IotHandler* handler, const char* mqtt_object_id, const char* mqtt_component)
+  : ActionModule(handler, mqtt_object_id, mqtt_component)
 {
-  _setupPins(offPin, lowPin, medPin, highPin);
-  _setupTopic(_mqtt_fanspeed_action_topic, MQTT_ACTION_TOPIC_SUFFIX, speedName, modName);
-  _setupTopic(_mqtt_fanspeed_status_topic, MQTT_STATUS_TOPIC_SUFFIX, speedName, modName);
+  Serial.println("Start FanModule");
 }
 
-void Fan::onConnect() {                                 //redefine onConnect
-  ToggleRelayModule::onConnect();
-  Serial.print(" & ");
-  Serial.print(_mqtt_fanspeed_action_topic);
-  Serial.println("...");
-  handler->client.subscribe(_mqtt_fanspeed_action_topic);
-  _publishStatus();
+void Fan::_setup() {
+  ActionModule::_setup();
+  Serial.println("Setup FanModule");
+  String s = "~/";
+  s.concat(MQTT_FAN_SPEED_NAME);
+  s.concat("/");
+  s.concat(MQTT_COMMAND_TOPIC_SUFFIX);
+  _setupTopic(_mqtt_fanspeed_command_topic, MQTT_FAN_SPEED_NAME, MQTT_COMMAND_TOPIC_SUFFIX);
+  _addConfigElement("spd_cmd_t", s.c_str());
+  String t = "~/";
+  t.concat(MQTT_FAN_SPEED_NAME);
+  t.concat("/");
+  t.concat(MQTT_STATUS_TOPIC_SUFFIX);
+  _setupTopic(_mqtt_fanspeed_status_topic, MQTT_FAN_SPEED_NAME, MQTT_STATUS_TOPIC_SUFFIX);
+  _addConfigElement("spd_stat_t", t.c_str());
 }
 
-bool Fan::triggerAction(String topic, String payload) { //redefine triggerAction
-  if (topic == _mqtt_action_topic && payload == _mqtt_fan_on_payload) {
+void Fan::_onConnect() {
+  ActionModule::_onConnect();
+  Serial.printf("Subscribing to %s\n", _mqtt_fanspeed_command_topic);
+  getClient().subscribe(_mqtt_fanspeed_command_topic);
+}
+
+bool Fan::_handleAction(String topic, String payload) { //redefine triggerAction
+  bool flag = ActionModule::_handleAction(topic, payload);
+
+  if (topic == _mqtt_command_topic && payload == _mqtt_state_on_payload) {
     if (_fan_onDelay_bool) {
-      _onFlag = true;
+      flag = true;
+      _delayOnFlag = true;
       _fan_onTime = millis() + _fan_onDelay;
+      Serial.printf("Delayed On Setup... time:%d\tonTime:%d\n", millis(), _fan_onTime);
     }
     else {
-      _fanState = true;
-      if (_fanSpeed == FAN_HIGH) {
-        _toggleRelay(_fan_high_pin);
-      }
-      else if (_fanSpeed == FAN_MED) {
-        _toggleRelay(_fan_med_pin);
-      }
-      else if (_fanSpeed == FAN_LOW) {
-        _toggleRelay(_fan_low_pin);
-      }
-      _publishStatus();
+      Serial.println("immediate on...\n");
+      flag = setState(true, getSpeed());
     }
   }
-  else if (topic == _mqtt_action_topic && payload == _mqtt_fan_off_payload) {
-    _toggleRelay(_fan_off_pin);
-    _fanState = false;
-    _publishStatus();
-    _onFlag = false;
+  else if (topic == _mqtt_command_topic && payload == _mqtt_state_off_payload) {
+    flag = setState(false, getSpeed());
   }
-  else if (topic == _mqtt_fanspeed_action_topic && payload == _mqtt_fanSpeed_high_payload) {
-    _fanSpeed = FAN_HIGH;
-    if (_fanState == true) {
-      _toggleRelay(_fan_high_pin);
-    }
-    _publishStatus();
-    _onFlag = false;
+  else if (topic == _mqtt_fanspeed_command_topic && payload == _mqtt_fanSpeed_high_payload) {
+    flag = setState(true, FAN_HIGH);
   }
-  else if (topic == _mqtt_fanspeed_action_topic && payload == _mqtt_fanSpeed_med_payload) {
-    _fanSpeed = FAN_MED;
-    if (_fanState == true) {
-      _toggleRelay(_fan_med_pin);
-    }
-    _publishStatus();
-    _onFlag = false;
+  else if (topic == _mqtt_fanspeed_command_topic && payload == _mqtt_fanSpeed_med_payload) {
+    flag = setState(true, FAN_MED);
   }
-  else if (topic == _mqtt_fanspeed_action_topic && payload == _mqtt_fanSpeed_low_payload) {
-    _fanSpeed = FAN_LOW;
-    if (_fanState == true) {
-      _toggleRelay(_fan_low_pin);
-    }
-    _publishStatus();
-    _onFlag = false;
+  else if (topic == _mqtt_fanspeed_command_topic && payload == _mqtt_fanSpeed_low_payload) {
+    flag = setState(true, FAN_LOW);
   }
-  else {
-    return false;
-  }
-  return true;
-}
-void Fan::loop() {                                       //redefine loop
-  _handle_FanOnDelay();
+  return flag;
 }
 
-void Fan::_setupPins(int offPin, int lowPin, int medPin, int highPin) {
-  _fan_off_pin = offPin;
-  _fan_low_pin = lowPin;
-  _fan_med_pin = medPin;
-  _fan_high_pin = highPin;
-  pinMode(_fan_off_pin, OUTPUT);
-  pinMode(_fan_low_pin, OUTPUT);
-  pinMode(_fan_med_pin, OUTPUT);
-  pinMode(_fan_high_pin, OUTPUT);
-  if (_activeHighRelay) {
-    // Set output pins LOW with an active-high relay
-    digitalWrite(_fan_off_pin, LOW);
-    digitalWrite(_fan_low_pin, LOW);
-    digitalWrite(_fan_med_pin, LOW);
-    digitalWrite(_fan_high_pin, LOW);
-  }
-  else {
-    // Set output pins HIGH with an active-low relay
-    digitalWrite(_fan_off_pin, HIGH);
-    digitalWrite(_fan_low_pin, HIGH);
-    digitalWrite(_fan_med_pin, HIGH);
-    digitalWrite(_fan_high_pin, HIGH);
-  }
+void Fan::_loop() {
+  ActionModule::_loop();
+  //The fan speed and state messages are received out of order. Only process the fan on commands if speed is not already affected.
 
-  //Set fan to known off state
-  ToggleRelayModule::_toggleRelay(_fan_off_pin);
-  _fanState = false;
-  _fanSpeed = FAN_MED;
+  if (_fan_onDelay_bool && _delayOnFlag && millis() >= _fan_onTime) {
+    Serial.printf("Delayed On Start... time:%d\tonTime%d\t\n", millis(), _fan_onTime);
+    _delayOnFlag = false;
+    setState(true, getSpeed());
+  }
 }
 
-//The fan speed and state messages are received out of order. Only process the fan on commands if speed is not already affected.
-void Fan::_handle_FanOnDelay() {
-    if (_fan_onDelay_bool && _onFlag && millis() >= _fan_onTime) {
-    _onFlag = false;
-    _fanState = true;
-    if (_fanSpeed == FAN_HIGH) {
-      ToggleRelayModule::_toggleRelay(_fan_high_pin);
-    }
-    else if (_fanSpeed == FAN_MED) {
-      ToggleRelayModule::_toggleRelay(_fan_med_pin);
-    }
-    else if (_fanSpeed == FAN_LOW) {
-      ToggleRelayModule::_toggleRelay(_fan_low_pin);
-    }
-    Serial.print("Delayed On... ");
-    _publishStatus();
-  }
-}
 
 void Fan::_publishStatus() {
   _publishFanStatus();
@@ -131,30 +78,84 @@ void Fan::_publishStatus() {
 }
 
 void Fan::_publishFanStatus() {
-  Serial.print("Publishing Fan Speed: ");
-  if (_fanState) {
-    handler->client.publish(_mqtt_status_topic, FAN_ON_PAYLOAD, true);
-    Serial.println(FAN_ON_PAYLOAD);
+  if (getState()) {
+    Serial.printf("Publishing Fan State: %s to %s\n", _mqtt_state_on_payload, _mqtt_status_topic);
+    getClient().publish(_mqtt_status_topic, _mqtt_state_on_payload, true);
   }
   else {
-    handler->client.publish(_mqtt_status_topic, FAN_OFF_PAYLOAD, true);
-    Serial.println(FAN_OFF_PAYLOAD);
+    Serial.printf("Publishing Fan State: %s to %s\n", _mqtt_state_off_payload, _mqtt_status_topic);
+    getClient().publish(_mqtt_status_topic, _mqtt_state_off_payload, true);
   }
 }
 
 void Fan::_publishSpeedStatus() {
-  Serial.print("Publishing Fan Speed: ");
-  if (_fanSpeed == FAN_LOW) {
-    handler->client.publish(_mqtt_fanspeed_status_topic, FAN_LOW_PAYLOAD, true);
-    Serial.println(FAN_LOW_PAYLOAD);
+  switch (_fanSpeed) {
+    case FAN_LOW:
+      Serial.printf("Publishing Fan Speed: %s to %s\n", _mqtt_fanSpeed_low_payload, _mqtt_fanspeed_status_topic);
+      getClient().publish(_mqtt_fanspeed_status_topic, _mqtt_fanSpeed_low_payload, true);
+      break;
+    case FAN_MED:
+      Serial.printf("Publishing Fan Speed: %s to %s\n", _mqtt_fanSpeed_med_payload, _mqtt_fanspeed_status_topic);
+      getClient().publish(_mqtt_fanspeed_status_topic, _mqtt_fanSpeed_med_payload, true);
+      break;
+    case FAN_HIGH:
+      Serial.printf("Publishing Fan Speed: %s to %s\n", _mqtt_fanSpeed_high_payload, _mqtt_fanspeed_status_topic);
+      getClient().publish(_mqtt_fanspeed_status_topic, _mqtt_fanSpeed_high_payload, true);
+      break;
   }
-  else if (_fanSpeed == FAN_MED) {
-    handler->client.publish(_mqtt_fanspeed_status_topic, FAN_MED_PAYLOAD, true);
-    Serial.println(FAN_MED_PAYLOAD);
+}
+
+bool Fan::setState(bool state, FanSpeed speed) {
+  if (state) {
+    bool success = false;
+    if (speed == FAN_HIGH) {
+      success = _setHigh();
+    }
+    else if (speed == FAN_MED) {
+      success = _setMed();
+    }
+    else if (speed == FAN_LOW) {
+      success = _setLow();
+    }
+    if (success) {
+      _delayOnFlag = false;
+      _fanState = true;
+      _fanSpeed = speed;
+      _publishStatus();
+      return true;
+    }
   }
-  else if (_fanSpeed == FAN_HIGH) {
-    handler->client.publish(_mqtt_fanspeed_status_topic, FAN_HIGH_PAYLOAD, true);
-    Serial.println(FAN_HIGH_PAYLOAD);
+  else {
+    if (_setOff()) {
+      if (speed != _fanSpeed) {
+        _fanSpeed = speed;
+      }
+      _delayOnFlag = false;
+      _fanState = false;
+      _publishStatus();
+      return true;
+    }
   }
+  return false;
+}
+
+Fan_Pin::Fan_Pin(IotHandler* handler, const char* mqtt_object_id, int offPin, int lowPin, int medPin, int highPin, bool restingState, long relayActiveTime, const char* mqtt_component)
+  : Fan(handler, mqtt_object_id, mqtt_component),
+    _off_toggle(offPin, restingState, relayActiveTime),
+    _low_toggle(lowPin, restingState, relayActiveTime),
+    _med_toggle(medPin, restingState, relayActiveTime),
+    _high_toggle(highPin, restingState, relayActiveTime)
+{
+  Serial.println("Start Fan_PinModule");
+}
+
+Fan_Pin::Fan_Pin(IotHandler* handler, const char* mqtt_object_id, int offPin, int lowPin, int medPin, int highPin, const char* mqtt_component)
+  : Fan(handler, mqtt_object_id, mqtt_component),
+    _off_toggle(offPin),
+    _low_toggle(lowPin),
+    _med_toggle(medPin),
+    _high_toggle(highPin)
+{
+  Serial.println("Start Fan_PinModule");
 }
 
