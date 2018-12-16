@@ -1,41 +1,6 @@
-
-#fan
-- platform: mqtt
-  name: "lrceilingfan"
-  state_topic: "LR_FAN/FAN/STATE"
-  command_topic: "LR_FAN/FAN/SET"
-  speed_state_topic: "LR_FAN/FAN/SPEED/STATE"
-  speed_command_topic: "LR_FAN/FAN/SPEED/SET"
-  availability_topic: "LR_FAN/AVAILIBILITY"
-  qos: 0
-  payload_on: "FAN_ON"
-  payload_off: "FAN_OFF"
-  payload_low_speed: "FAN_LOW"
-  payload_medium_speed: "FAN_MED"
-  payload_high_speed: "FAN_HIGH"
-  speeds:
-    - low
-    - medium
-    - high
-  payload_available: "ONLINE"
-  payload_not_available: "OFFLINE"
-
-#light
-- platform: mqtt
-  name: "lrfanlight"
-  state_topic: "LR_FAN/LIGHT/STATE"
-  command_topic: "LR_FAN/LIGHT/SET"
-  availability_topic: "LR_FAN/AVAILIBILITY"
-  payload_on: "LIGHT_ON"
-  payload_off: "LIGHT_OFF"
-  payload_available: "ONLINE"
-  payload_not_available: "OFFLINE"
-  
-  
-#script to invert
 invert_lr_fanlight:
   sequence:
     - service: mqtt.publish
       data:
-        topic: "LR_FAN/LIGHT/COMMAND"
-        payload: "INVERT_LIGHT"
+        topic: "homeassistant/light/LR_FAN/LRFanLight/set"
+        payload: "INVERT"

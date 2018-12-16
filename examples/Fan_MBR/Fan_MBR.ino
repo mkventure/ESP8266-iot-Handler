@@ -2,13 +2,11 @@
 
 #include "IotHandler.h"
 #include "Fan.h"
-#include "Light.h"
 #include "BinarySensor.h"
 
 IotHandler* handler = IotHandler::getInstance();
-BinaryLight_TogglePin light(handler, "LRFanLight", LIGHT_PIN, true, false, 400);
-BinarySensor_Pin binarySensor1 (handler, "LRPIR", PIR_PIN, "motion");
-Fan_Pin fan(handler, "LRFan", FAN_OFF_PIN, FAN_LOW_PIN, FAN_MED_PIN, FAN_HIGH_PIN, false, 400);
+BinarySensor_Pin binarySensor1 (handler, "MBRPIR", PIR_PIN, "motion");
+Fan_Pin fan(handler, "MBRFan", FAN_OFF_PIN, FAN_LOW_PIN, FAN_MED_PIN, FAN_HIGH_PIN, false, 400);
 
 void setup() {
   Serial.begin(115200);

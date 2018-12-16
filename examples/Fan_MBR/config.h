@@ -12,14 +12,25 @@
 #define MQTT_PORT 1883
 #define MQTT_USERNAME SECRET_MQTT_USERNAME
 #define MQTT_PASSWORD SECRET_MQTT_PASSWORD
-#define MQTT_NODE_ID "LR_FAN"
+#define MQTT_NODE_ID "MBR"
 #define MQTT_DISCOVERY_PREFIX "homeassistant"
 
 // Module Config
-#define FAN_OFF_PIN 5
-#define FAN_LOW_PIN 14
-#define FAN_MED_PIN 12
-#define FAN_HIGH_PIN 16
-#define LIGHT_PIN 13
+#define PIR_PIN 12     //D6
 
-#define PIR_PIN 4
+#define FAN_OFF_PIN 4 //D2
+#define FAN_LOW_PIN 13 //D7
+#define FAN_MED_PIN 14 //D5
+#define FAN_HIGH_PIN 5 //D1
+
+
+/*
+From Silver:
+Stop
+High
+GND
+V+
+GND
+LOW
+MED
+*/
