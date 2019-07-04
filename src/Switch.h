@@ -1,49 +1,109 @@
-#include "Arduino.h"
 #ifndef SwitchModule_h
 #define SwitchModule_h
 
-#include "Module.h"
+#include "IotHandler.h"
+#include "SwitchInterface.h"
+#include "Arduino.h"
 
-#define MQTT_SWITCH_NAME "SWITCH"
+#define SWITCH_FUNCTION_CALLBACK void (*callback_on_function)()
+#define SWITCH_FUNCTION_CALLBACK void (*callback_off_function)()
 
-#define SWITCH_ON_PAYLOAD "SWITCH_ON"
-#define SWITCH_OFF_PAYLOAD "SWITCH_OFF"
 
-class BinarySwitch: public ActionModule
+class Switch : public ActionModule
 {
   public:
-    BinarySwitch(IotHandler*, const char* modName = MQTT_SWITCH_NAME, bool state = false);
+    Switch(IotHandler*, const char*, bool state, bool invert, const char* = "switch");
+    Switch(IotHandler*, const char*, const char* = "switch");
 
-    void onConnect();                                 //redefine onConnect
-    bool triggerAction(String topic, String payload); //redefine triggerAction
-    void loop();                                      //redefine loop
-	bool getState();
-    virtual bool setState(bool);
-    bool setStateFor(bool, unsigned long);
+    virtual bool setState(bool) = 0;
+    virtual bool setStateFor(bool, unsigned long) = 0;
+    virtual bool getState() = 0;
 
   protected:
+    bool _handleAction(String topic, String payload);
     void _publishStatus();
-    
-    bool _timerFlag = false;
-    unsigned long _timer;
+    //    virtual void _setup();
+    //    virtual void _loop();
 
-    bool _switchState;
-
-    const char* _mqtt_switch_on_payload = SWITCH_ON_PAYLOAD;
-    const char* _mqtt_switch_off_payload = SWITCH_OFF_PAYLOAD;
+  private:
+    const char* _mqtt_state_on_payload = STATE_ON_PAYLOAD;
+    const char* _mqtt_state_off_payload = STATE_OFF_PAYLOAD;
 };
 
-
-class BinarySwitch_Pin: public BinarySwitch
+class Switch_Function : public Switch
 {
   public:
-    BinarySwitch_Pin(IotHandler*, int, const char* modName = MQTT_SWITCH_NAME, bool state = false);
-    bool setState(bool) override;
-    
-  protected:
-    void _setupPins(int);
+    Switch_Function(IotHandler* handler, const char* mqtt_object_id, void (*callback_on_function)(), void (*callback_off_function)(), bool state, const char* mqtt_component = "switch")
+      : Switch(handler, mqtt_object_id, state, mqtt_component), switchFunction(callback_on_function, callback_off_function) {};
 
-    int _switch_pin;
+    virtual bool setState(bool state);
+    bool setStateFor(bool state, unsigned long time) {
+      return switchFunction.setStateFor(state, time);
+    }
+    bool getState() {
+      return switchFunction.getState();
+    }
+
+  protected:
+    SwitchInterface_Function switchFunction;
+
+    void _loop() {
+      switchFunction.switch_loop();
+    }
 };
 
+class Switch_Pin : public Switch
+{
+  public:
+    Switch_Pin(IotHandler* handler, const char* mqtt_object_id, int pin, bool state, bool invert, const char* mqtt_component = "switch")
+      : Switch(handler, mqtt_object_id, mqtt_component), switchPin(pin, state, invert) {};
+    Switch_Pin(IotHandler* handler, const char* mqtt_object_id, int pin, const char* mqtt_component = "switch")
+      : Switch(handler, mqtt_object_id, mqtt_component), switchPin(pin) {};
+
+    virtual bool setState(bool state);
+    bool setStateFor(bool state, unsigned long time) {
+      return switchPin.setStateFor(state, time);
+    }
+    bool getState() {
+      return switchPin.getState();
+    }
+
+  protected:
+    SwitchInterface_Pin switchPin;
+
+    void _loop() {
+      switchPin.switch_loop();
+    }
+};
+
+class ToggleSwitch_Function : public Switch_Function
+{
+  public:
+    ToggleSwitch_Function(IotHandler* handler, const char* mqtt_object_id, void (*callback_on_function)(), void (*callback_off_function)(), bool state, int toggleTime, const char* mqtt_component = "switch")
+      : Switch_Function(handler, mqtt_object_id, callback_on_function, callback_off_function, state, mqtt_component), _toggleTime(toggleTime) {};
+
+    bool setState(bool state) {
+      return setStateFor(state, _toggleTime);
+    }
+
+  protected:
+    int _toggleTime;
+};
+
+
+class ToggleSwitch_Pin : public Switch_Pin
+{
+  public:
+    ToggleSwitch_Pin(IotHandler* handler, const char* mqtt_object_id, int pin, int toggleTime, bool state, bool invert, const char* mqtt_component = "switch")
+      : Switch_Pin(handler, mqtt_object_id, pin, state, invert, mqtt_component), _toggleTime(toggleTime) {};
+    ToggleSwitch_Pin(IotHandler* handler, const char* mqtt_object_id, int pin, int toggleTime, const char* mqtt_component = "switch")
+      : Switch_Pin(handler, mqtt_object_id, pin, mqtt_component), _toggleTime(toggleTime) {};
+
+    bool setState(bool state) {
+      return setStateFor(state, _toggleTime);
+    }
+
+  protected:
+    int _toggleTime;
+};
 #endif

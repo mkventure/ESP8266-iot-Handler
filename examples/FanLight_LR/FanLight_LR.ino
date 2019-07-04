@@ -3,43 +3,22 @@
 #include "IotHandler.h"
 #include "Fan.h"
 #include "Light.h"
+#include "BinarySensor.h"
 
-IotHandler handler(WIFI_PIN, LED_PIN, WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER, MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD);
-Fan fan(&handler, FAN_OFF_PIN, FAN_LOW_PIN, FAN_MED_PIN, FAN_HIGH_PIN);
-BinaryRelayLight light(&handler, LIGHT_PIN);
+IotHandler* handler = IotHandler::getInstance();
+BinaryLight_TogglePin light(handler, "LRFanLight", LIGHT_PIN, true, false, 400);
+BinarySensor_Pin binarySensor1 (handler, "LRPIR", PIR_PIN, "motion");
+Fan_Pin fan(handler, "LRFan", FAN_OFF_PIN, FAN_LOW_PIN, FAN_MED_PIN, FAN_HIGH_PIN, false, 400);
 
 void setup() {
-  handler.set_onAction_callback(onAction);
-  handler.set_onConnect_callback(onConnect);
+  Serial.begin(115200);
+  Serial.println("Begin Setup");
+  handler->setParams(WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER, MQTT_PORT, MQTT_NODE_ID, MQTT_USERNAME, MQTT_PASSWORD, MQTT_DISCOVERY_PREFIX);
+  handler->setup();
+  delay(50);
+  fan.setState(false, FAN_MED);
 }
 
 void loop() {
-  handler.loop();
-  fan.loop();
-  light.loop();
-}
-
-// Callback when MQTT message is received; passing topic and payload as parameters
-void onAction(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-
-  Serial.println();
-
-  String topicToProcess = topic;
-  payload[length] = '\0';
-  String payloadToProcess = (char*)payload;
-  if (!fan.triggerAction(topicToProcess, payloadToProcess) and !light.triggerAction(topicToProcess, payloadToProcess)) {
-    Serial.println("Unrecognized action payload... taking no action!");
-  }
-}
-
-void onConnect() {
-  fan.onConnect();
-  light.onConnect();
+  handler->loop();
 }

@@ -1,37 +1,17 @@
 #include "IotHandler.h"
-#include "Arduino.h"
 
-#define WIFI_SETUP_INTERVAL 30000
-#define WIFI_RESTART_INTERVAL 6000000
-#define MQTT_RECONNECT_INTERVAL 10000
-#define HEARTBEAT 250
+/*
+   wifi_ssid - Wifi SSID
+   wifi_password - wifi password
+   mqtt_broker - IP of the mqtt broker sever
+   int mqtt_port - port of mqtt server
+   mqtt_node_id - the name of the ESP Node
+   mqtt_username - the username to login to mqtt server
+   mqtt_password - the password to login to mqtt server
+   discover_prefix - the discovery prefix for mqtt server - https://www.home-assistant.io/docs/mqtt/discovery/
+*/
 
-#define AVAILABLE_PAYLOAD "ONLINE"
-#define UNAVAILABLE_PAYLOAD "OFFLINE"
-
-#define MQTT_AVAILIBILITY_TOPIC_SUFFIX "/AVAILIBILITY"
-#define OTA_HOSTNAME_PREFIX "OTA_"
-
-IotHandler::IotHandler() {
-}
-
-IotHandler::IotHandler(int wifi_pin, int led_pin, const char* wifi_ssid, const char* wifi_password, const char* mqtt_broker, const char* mqtt_clientId, const char* mqtt_username, const char* mqtt_password)
-{
-  setPins(wifi_pin, led_pin);
-  setParams(wifi_ssid, wifi_password, mqtt_broker, mqtt_clientId, mqtt_username, mqtt_password);
-  setup();
-}
-
-
-void IotHandler::setPins(int wifi_pin, int led_pin) {
-  this->wifi_pin = wifi_pin;
-  this->led_pin = led_pin;
-
-  pinMode(led_pin, OUTPUT);
-  pinMode(wifi_pin, OUTPUT);
-}
-
-void IotHandler::setParams(const char* wifi_ssid, const char* wifi_password, const char* mqtt_broker, const char* mqtt_clientId, const char* mqtt_username, const char* mqtt_password) {
+void IotHandler::setParams(const char* wifi_ssid, const char* wifi_password, const char* mqtt_broker, int mqtt_port, const char* mqtt_node_id, const char* mqtt_username, const char* mqtt_password, const char* discover_prefix) {
   // WIFI Params
   _wifi_ssid = wifi_ssid;
   _wifi_password = wifi_password;
@@ -40,34 +20,62 @@ void IotHandler::setParams(const char* wifi_ssid, const char* wifi_password, con
 
   // MQTT PARAMS
   _mqtt_broker = mqtt_broker;
-  this->mqtt_clientId = mqtt_clientId;
+  _mqtt_port = mqtt_port;
+  _mqtt_node_id = mqtt_node_id;
   _mqtt_username = mqtt_username;
   _mqtt_password = mqtt_password;
-  _mqtt_port = 1883;
+  _discover_prefix = discover_prefix;
 
-  _birthMessage = AVAILABLE_PAYLOAD;
-  _lwtMessage = UNAVAILABLE_PAYLOAD;
-
+  //<discovery_prefix>/<component>/<node_id>/<object_id>/<topic>.
+  //<discovery_prefix>/module/<node_id>/availible
   const char *availibility_suffix = MQTT_AVAILIBILITY_TOPIC_SUFFIX;
-  strcpy(_availabilityTopic, mqtt_clientId);
+  strcpy(_availabilityTopic, _discover_prefix);
+  strcat(_availabilityTopic, "/module/");
+  strcat(_availabilityTopic, _mqtt_node_id);
+  strcat(_availabilityTopic, "/");
   strcat(_availabilityTopic, availibility_suffix);
 
   // OTA PARAMS
-  const char *ota_prefix = OTA_HOSTNAME_PREFIX;
-  strcpy(_otaName, ota_prefix);
-  strcat(_otaName, mqtt_clientId);
-
+//  const char *ota_prefix = OTA_HOSTNAME_PREFIX;
+  
+  snprintf(_otaName, 20, "%s_%X-%s", mqtt_node_id, ESP.getChipId(), OTA_HOSTNAME_PREFIX);
+//  strcpy(_otaName, ota_prefix);
+//  strcat(_otaName, mqtt_node_id);
+//  strcat(_otaName, ESP.getChipId().c_str());
 }
+
 void IotHandler::setup() {
-  client.setClient(espClient);
+  _client.setClient(espClient);
   delay(10);
-  Serial.begin(115200);
+  _client.setCallback(actionCaller);
 
   setupWiFi();
   setupOTA();
   setupMQTT();
 
+  yield();
+
+  for (int i = 0; i < _index; i++) {
+    Serial.printf("Run Module %d Setup\n", i);
+    _module_array[i]->_setup();
+    _client.loop();
+    yield();
+  }
   Serial.println("Ready");
+}
+
+
+bool IotHandler::addModule(Module* module) {
+  if (_index + 1 <= _MODULE_ARRAY_SIZE) {
+    _module_array[_index] = module;
+    Serial.printf("\tModule %d, %s, Added.\n", _index, module->_mqtt_object_id);
+    _index++;
+    return true;
+  }
+  else {
+    Serial.println("\t\t\tERROR - Module Not Added");
+    return false;
+  }
 }
 
 /*************************************************************************
@@ -130,9 +138,8 @@ void IotHandler::reconnectWiFi() {
 // Setup the MQTT connection to begin
 
 void IotHandler::setupMQTT() {
-  client.disconnect();
-  client.setServer(_mqtt_broker, _mqtt_port);
-  //  client.setCallback(callbackPrinter);
+  _client.disconnect();
+  _client.setServer(_mqtt_broker, _mqtt_port);
 }
 
 // Function that runs in loop() to connect/reconnect to the MQTT broker, and publish the current statuses on connect
@@ -142,18 +149,22 @@ void IotHandler::reconnectMQTT() {
   const unsigned long reconnectInterval = MQTT_RECONNECT_INTERVAL;
   unsigned long currentMillis = millis();
 
+
   if (currentMillis - reconnectMillis >= reconnectInterval) {
     reconnectMillis = currentMillis;
-    digitalWrite(wifi_pin, false);
+    digitalWrite(_wifi_pin, false);
     Serial.print("Attempting MQTT connection...");
-    if (client.connect(mqtt_clientId, _mqtt_username, _mqtt_password, _availabilityTopic, 0, true, _lwtMessage)) {
+
+
+    if (_client.connect(_otaName, _mqtt_username, _mqtt_password, _availabilityTopic, 0, true, _lwtMessage)) {
+      //    if (_client.connect(_mqtt_node_id, _mqtt_username, _mqtt_password, "TEST/AVAILIBILITY", 0, true, _lwtMessage)) {
       Serial.print("\n");
       publish_birth_message();
-      callbackConnect();
+      _onConnect();
     }
     else {
       Serial.print("failed, rc=");
-      Serial.print(client.state());
+      Serial.print(_client.state());
       Serial.print(" try again in ");
       Serial.print(reconnectInterval);
       Serial.println(" ms");
@@ -161,35 +172,34 @@ void IotHandler::reconnectMQTT() {
   }
 }
 
-void IotHandler::set_onAction_callback(MQTT_CALLBACK_ACTION_SIGNATURE) {
-  client.setCallback(callback);
+void IotHandler::_triggerAction(char* topic, byte* payload, unsigned int length) {
+  bool action_flag = false;
+  String topicToProcess = topic;
+  payload[length] = '\0';
+  String payloadToProcess = (char*)payload;
+
+  Serial.printf("%d: Message Arrived: %s from %s\n", millis(), payloadToProcess.c_str(), topicToProcess.c_str());
+
+  for (int i = 0; i < _index; i++) {
+    if (_module_array[i]->_handleAction(topicToProcess, payloadToProcess)) {
+      action_flag = true;
+      _client.loop();
+    }
+  }
+
+  if (!action_flag) {
+    Serial.println("Unrecognized topic / payload... taking no action!");
+  }
 }
 
-void IotHandler::set_onConnect_callback(MQTT_CALLBACK_CONNECT_SIGNATURE) {
-  this->callbackConnect = callbackConnect;
+void IotHandler::_onConnect() {
+  for (int i = 0; i < _index; i++) {
+    _module_array[i]->_onConnect();
+    _client.loop();
+  }
 }
-
-// Callback when MQTT message is received; calls triggerAction(), passing topic and payload as parameters
-
-//static void onAction(char* topic, byte* payload, unsigned int length) { //MQTT_CALLBACK_ACTION_SIGNATURE) { //char* topic, byte* payload, unsigned int length) {
-//  Serial.print("Message arrived [");
-//  Serial.print(topic);
-//  Serial.print("] ");
-//
-//  for (int i = 0; i < length; i++) {
-//    Serial.print((char)payload[i]);
-//  }
-//
-//  Serial.println();
-//
-//  String topicToProcess = topic;
-//  payload[length] = '\0';
-//  String payloadToProcess = (char*)payload;
-//  //  triggerAction(topicToProcess, payloadToProcess); //TODO
-//}
 
 // Function that publishes birthMessage
-
 void IotHandler::publish_birth_message() {
   // Publish the birthMessage
   Serial.print("Publishing birth message \"");
@@ -197,7 +207,7 @@ void IotHandler::publish_birth_message() {
   Serial.print("\" to ");
   Serial.print(_availabilityTopic);
   Serial.println("...");
-  client.publish(_availabilityTopic, _birthMessage, true);
+  _client.publish(_availabilityTopic, _birthMessage, true);
 }
 
 void IotHandler::printMQTTState(int state) {
@@ -244,20 +254,26 @@ void IotHandler::printMQTTState(int state) {
 
 void IotHandler::loop() {
   ArduinoOTA.handle();
-  client.loop();
+  _client.loop();
+
+  for (int i = 0; i < _index; i++) {
+    //    Serial.printf("Run Module %d\n", i);
+    _module_array[i]->_loop();
+    _client.loop();
+  }
 
   static int mqttStatus = -99;
-  if (mqttStatus != client.state()) {
+  if (mqttStatus != _client.state()) {
     Serial.print("\tMQTT Status Changed from ");
     printMQTTState(mqttStatus);
     Serial.print(" to ");
-    mqttStatus = client.state();
+    mqttStatus = _client.state();
     printMQTTState(mqttStatus);
     Serial.println();
   }
 
   bool wifi = WiFi.status() == WL_CONNECTED;
-  bool mqtt = client.connected();
+  bool mqtt = _client.connected();
 
   reconnectWiFi();
   if (wifi & !mqtt) {
@@ -278,21 +294,21 @@ void IotHandler::heartBeat(bool wifi, bool mqtt) {
   //  Serial.println(hbMode);
   if (!wifi && hbMode != 1) {
     Serial.println("HeartBeatMode Changed: Waiting for Wifi...");
-    digitalWrite(led_pin, LOW); // switches the redLED on
+    digitalWrite(_led_pin, LOW); // switches the redLED on
     ledState = LOW;
     previousMillis = currentMillis - interval;
     hbMode = 1;
   }
   else if (!mqtt && wifi && hbMode != 2) {
     Serial.println("HeartBeatMode Changed: Waiting for MQTT...");
-    digitalWrite(led_pin, HIGH); // switches the LED off
+    digitalWrite(_led_pin, HIGH); // switches the LED off
     ledState = LOW;
     hbMode = 2;
     previousMillis = currentMillis - interval;
   }
   else if (wifi && mqtt && hbMode != 0) {
     Serial.println("HeartBeatMode Changed: Running!");
-    digitalWrite(wifi_pin, HIGH);
+    digitalWrite(_wifi_pin, HIGH);
     ledState = LOW;
     hbMode = 0;
     previousMillis = currentMillis - interval;
@@ -301,10 +317,10 @@ void IotHandler::heartBeat(bool wifi, bool mqtt) {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     if (hbMode == 0) {
-      digitalWrite(led_pin, ledState);
+      digitalWrite(_led_pin, ledState);
     }
     else {
-      digitalWrite(wifi_pin, ledState);
+      digitalWrite(_wifi_pin, ledState);
     }
     ledState = !ledState;
   }
@@ -346,4 +362,5 @@ void IotHandler::setupOTA() {
   });
   ArduinoOTA.begin();
 }
+
 

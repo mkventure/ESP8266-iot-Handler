@@ -1,104 +1,79 @@
 #include "BinarySensor.h"
 
-BinarySensor::BinarySensor(IotHandler* handler, const char* modName)
-  : Module(handler, modName)
+BinarySensor::BinarySensor(IotHandler* handler, const char* mqtt_object_id, const char* mqtt_device)
+  : Module(handler, mqtt_object_id, MQTT_COMPONENT_BINARYSENSOR), _debounceTime(0)
 {
-  _changeTime = millis();
-  _sensorState = false;
-}
-
-void BinarySensor::onConnect() {
-  Module::onConnect();
-  _publishStatus();
-}
-
-bool BinarySensor::triggerAction(String topic, String payload) {
-  if (topic == Module::_mqtt_command_topic && payload == _mqtt_binarysensor_read_payload) {
-    _publishStatus();
-  }
-  else {
-    return false;
-  }
-  return true;
-}
-
-bool BinarySensor::setState(bool state) {
-  if (_sensorState != state) {
-    _changeTime = millis();
-    _sensorState = state;
-    return true;
-  }
-  else {
-    return false;
+  Serial.println("Start BinarySensor");
+  if (strncmp(mqtt_device, "None", 4) != 0) {
+    Serial.printf("device class set to %s\n", mqtt_device);
+    _addConfigElement("dev_cla", mqtt_device);
   }
 }
 
-bool BinarySensor::getState() {
-  return _sensorState;
-}
-
-unsigned long BinarySensor::getChangeTime() {
-  return _changeTime;
+BinarySensor::BinarySensor(IotHandler* handler, const char* mqtt_object_id, int debounceTime, const char* mqtt_device)
+  : Module(handler, mqtt_object_id, MQTT_COMPONENT_BINARYSENSOR), _debounceTime(debounceTime)
+{
+  Serial.println("Start BinarySensor");
+  if (strncmp(mqtt_device, "None", 4) != 0) {
+    Serial.printf("device class set to %s\n", mqtt_device);
+    _addConfigElement("dev_cla", mqtt_device);
+  }
 }
 
 void BinarySensor::_publishStatus() {
-  Serial.print("Publishing Sensor State: ");
-  if (_sensorState == true) {
-    Module::handler->client.publish(Module::_mqtt_status_topic, _mqtt_binarysensor_on_payload, true);
-    Serial.println(_mqtt_binarysensor_on_payload);
+  if (getState()) {
+    Serial.printf("Publishing BinarySensor State: %s to %s\n", _mqtt_state_on_payload, _mqtt_status_topic);
+    getClient().publish(_mqtt_status_topic, _mqtt_state_on_payload, true);
   }
-  else if (_sensorState == false) {
-    Module::handler->client.publish(Module::_mqtt_status_topic, _mqtt_binarysensor_off_payload, true);
-    Serial.println(_mqtt_binarysensor_off_payload);
+  else {
+    Serial.printf("Publishing BinarySensor State: %s to %s\n", _mqtt_state_off_payload, _mqtt_status_topic);
+    getClient().publish(_mqtt_status_topic, _mqtt_state_off_payload, true);
   }
 }
 
-BinarySensor_Pin::BinarySensor_Pin(IotHandler* handler, int pin, const char* modName, int debounceTime)
-  : BinarySensor(handler, modName)
-{
-  _setupPins(pin);
-  _debounceTime = debounceTime;
+void BinarySensor::_loop() {
+  readState();
 }
 
-//has the state changes since function last called
-bool BinarySensor_Pin::getStateChange() {
-  if (_sensorChange) {
-    _sensorChange = false;
+bool BinarySensor::readState() {
+  static unsigned long __lastDebounceTime = millis();
+  static bool __lastState = _sensorState;
+
+  bool change = false;
+
+  bool reading = readHWState();
+  if (reading != __lastState) {
+    Serial.printf("\tSensor Bouncing: %x\n", reading);
+    __lastDebounceTime = millis();
+    __lastState = reading;
+  }
+
+  if (reading != _sensorState && (millis() - __lastDebounceTime) > _debounceTime) {
+    Serial.printf("\tSensor Changeed: %x\n", reading);
+    _sensorState = reading;
+    _publishStatus();
     return true;
   }
   return false;
 }
 
-//redefine loop to read sensor on each loop.
-void BinarySensor_Pin::loop() {
-  if (_sensorRead()) {
-    _publishStatus();
-  }
-}
 
-void BinarySensor_Pin::_setupPins(int sensorPin) {
-  _sensorPin = sensorPin;
+BinarySensor_Pin::BinarySensor_Pin(IotHandler* handler, const char* mqtt_object_id, int pin, const char* mqtt_device)
+  : BinarySensor(handler, mqtt_object_id, mqtt_device), _sensorPin(pin)
+{
+  Serial.println("Start BinarySensor_Pin");
   pinMode(_sensorPin, INPUT_PULLUP);
-  //Set sensor to known off state
-  _sensorState = digitalRead(_sensorPin);
-  _sensorChange = true;
+  _sensorState = digitalRead(_sensorPin);   //Set sensor to initial state
 }
 
-bool BinarySensor_Pin::_sensorRead() {
-  static unsigned long __lastDebounceTime = 0;
-  static bool __lastState = _sensorState; //TODO - does this work? or does it need to be a constant?
-  bool change = false;
-  
-  bool reading = digitalRead(_sensorPin);
-  if (reading != __lastState) {
-    __lastDebounceTime = millis();
-  } 
-  
-  if ((millis() - __lastDebounceTime) > _debounceTime) {
-    change = BinarySensor::setState(reading);
-  }
-  
-  __lastState = reading;
-  return change;
+BinarySensor_Pin::BinarySensor_Pin(IotHandler* handler, const char* mqtt_object_id, int pin, int debounceTime, const char* mqtt_device)
+  : BinarySensor(handler, mqtt_object_id, debounceTime, mqtt_device), _sensorPin(pin)
+{
+  Serial.println("Start BinarySensor_Pin");
+  pinMode(_sensorPin, INPUT_PULLUP);
+  _sensorState = digitalRead(_sensorPin);   //Set sensor to initial state
 }
 
+bool BinarySensor_Pin::readHWState() {
+  return digitalRead(_sensorPin);
+}
