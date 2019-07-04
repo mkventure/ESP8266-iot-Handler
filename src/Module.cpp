@@ -20,7 +20,7 @@ void Module::_setup() {
   char device[111];
   snprintf(device, 110, "{\"model\": \"IotHandler\", \"identifiers\": \"%X\", \"connections\": [[\"mac\", \"%s\"]]}", ESP.getChipId(), WiFi.macAddress().c_str());
   _addConfigElement("\"device\"", device, false);
-  _addConfigElement("state_t", "~/state");
+  _addConfigElement("stat_t", "~/state");
   _addConfigElement("avty_t", _handler->_getAvailibilityTopic());
 }
 
@@ -81,7 +81,7 @@ void Module::_addConfigElement(String key, String value, bool addQuotes) {
 }
 
 void Module::_onConnect() {
-  bool success = getClient().publish(_mqtt_config_topic, _getConfigPayload().c_str(), false);
+  bool success = getClient().publish(_mqtt_config_topic, _getConfigPayload().c_str(), true);
   Serial.printf("Submitting Config: %x \n\t%s to \n\t%s\n", success, _getConfigPayload().c_str(), _mqtt_config_topic);
 //  Serial.println(getClient().publish(_mqtt_config_topic, "", true));
 //  delay(50);

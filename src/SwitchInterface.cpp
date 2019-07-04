@@ -56,6 +56,26 @@ bool SwitchInterface_Pin::setState(bool state) {
   return false;
 }
 
+
+SwitchInterface_Function::SwitchInterface_Function(void (*callback_on_function)(), void (*callback_off_function)(), bool initialState, bool invertOutput)
+  : SwitchInterface(initialState, invertOutput), callback_on_function(callback_on_function), callback_off_function(callback_off_function)
+{
+  Serial.println("Start SwitchInterface_Function");
+}
+
+bool SwitchInterface_Function::setState(bool state) {
+  if (SwitchInterface::setState(state)) {
+    if(state) {
+      callback_on_function;
+    }
+    else {
+      callback_off_function;
+    }
+    return true;
+  }
+  return false;
+}
+
 ToggleInterface::ToggleInterface(bool state, unsigned long toggle_time)
   : SwitchInterface(state, state), _toggleState(!state), _toggle_time(toggle_time)
 {
@@ -82,6 +102,25 @@ ToggleInterface_Pin::ToggleInterface_Pin(int pin, bool restingState, unsigned lo
 bool ToggleInterface_Pin::setState(bool restingState) {
   if (ToggleInterface::setState(restingState)) {
     digitalWrite(_pin, getRawState());
+    return true;
+  }
+  return false;
+}
+
+ToggleInterface_Function::ToggleInterface_Function(void (*callback_on_function)(), void (*callback_off_function)(), bool restingState, unsigned long toggle_time)
+  : ToggleInterface(restingState, toggle_time), callback_on_function(callback_on_function), callback_off_function(callback_off_function)
+{
+  Serial.println("Start SwitchInterface_Function");
+}
+
+bool ToggleInterface_Function::setState(bool restingState) {
+  if (ToggleInterface::setState(restingState)) {
+    if(getRawState()) {
+      callback_on_function();
+    }
+    else {
+      callback_off_function();
+    }
     return true;
   }
   return false;

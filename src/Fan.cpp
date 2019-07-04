@@ -158,4 +158,43 @@ Fan_Pin::Fan_Pin(IotHandler* handler, const char* mqtt_object_id, int offPin, in
 {
   Serial.println("Start Fan_PinModule");
 }
+Fan_Function::Fan_Function(IotHandler* handler, const char* mqtt_object_id,
+                  void (*callback_off_on_function)(), void (*callback_off_off_function)(), 
+                  void (*callback_low_on_function)(), void (*callback_low_off_function)(), 
+                  void (*callback_med_on_function)(), void (*callback_med_off_function)(), 
+                  void (*callback_high_on_function)(), void (*callback_high_off_function)(), 
+                  bool restingState, long relayActiveTime, const char* mqtt_component)
+  : Fan(handler, mqtt_object_id, mqtt_component),
+    _off_toggle(callback_off_on_function, callback_off_off_function, restingState, relayActiveTime),
+    _low_toggle(callback_low_on_function, callback_low_off_function, restingState, relayActiveTime),
+    _med_toggle(callback_med_on_function, callback_med_off_function, restingState, relayActiveTime),
+    _high_toggle(callback_high_on_function, callback_high_off_function, restingState, relayActiveTime)
+{
+  Serial.println("Start Fan_PinModule");
+}
 
+Fan_Function::Fan_Function(IotHandler* handler, const char* mqtt_object_id,
+                  void (*callback_off_on_function)(), void (*callback_off_off_function)(), 
+                  void (*callback_low_on_function)(), void (*callback_low_off_function)(), 
+                  void (*callback_med_on_function)(), void (*callback_med_off_function)(), 
+                  void (*callback_high_on_function)(), void (*callback_high_off_function)(), 
+                  const char* mqtt_component)
+  : Fan(handler, mqtt_object_id, mqtt_component),
+    _off_toggle(callback_off_on_function, callback_off_off_function),
+    _low_toggle(callback_low_on_function, callback_low_off_function),
+    _med_toggle(callback_med_on_function, callback_med_off_function),
+    _high_toggle(callback_high_on_function, callback_high_off_function)
+{
+  Serial.println("Start Fan_PinModule");
+}
+/*
+Fan_Function::Fan_Function(IotHandler* handler, const char* mqtt_object_id, int offPin, int lowPin, int medPin, int highPin, const char* mqtt_component)
+  : Fan(handler, mqtt_object_id, mqtt_component),
+    _off_toggle(offPin),
+    _low_toggle(lowPin),
+    _med_toggle(medPin),
+    _high_toggle(highPin)
+{
+  Serial.println("Start Fan_PinModule");
+}
+*/

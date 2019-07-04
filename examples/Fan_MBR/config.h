@@ -18,19 +18,30 @@
 // Module Config
 #define PIR_PIN 12     //D6
 
+/*
 #define FAN_OFF_PIN 4 //D2
 #define FAN_LOW_PIN 13 //D7
 #define FAN_MED_PIN 14 //D5
 #define FAN_HIGH_PIN 5 //D1
+*/
+
+#define J1 4
+#define J2 5
+#define J3 13
+#define J4 14
+
+#define RED_LIGHT_PIN 15
 
 
 /*
 From Silver:
-Stop
-High
+Stop J1 - 4
+High J2 - 5
 GND
 V+
 GND
-LOW
-MED
+LOW J3 - 13
+MED J4 - 14
 */
+
+

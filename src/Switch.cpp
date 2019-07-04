@@ -31,6 +31,13 @@ void Switch::_publishStatus() {
   }
 }
 
+bool Switch_Function::setState(bool state) {
+  if (switchFunction.setState(state)) {
+    _publishStatus();
+    return true;
+  }
+  return false;
+}
 
 bool Switch_Pin::setState(bool state) {
   if (switchPin.setState(state)) {

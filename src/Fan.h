@@ -109,4 +109,54 @@ class Fan_Pin : public Fan
     }
 };
 
+
+class Fan_Function : public Fan
+{
+  public:
+    Fan_Function(IotHandler*, const char*,
+                  void (*callback_off_on_function)(), void (*callback_off_off_function)(), 
+                  void (*callback_low_on_function)(), void (*callback_low_off_function)(), 
+                  void (*callback_med_on_function)(), void (*callback_med_off_function)(), 
+                  void (*callback_high_on_function)(), void (*callback_high_off_function)(), 
+                  bool restingState, long relayActiveTime = TOGGLE_TIME, const char* = "fan");
+    Fan_Function(IotHandler*, const char*,
+                  void (*callback_off_on_function)(), void (*callback_off_off_function)(), 
+                  void (*callback_low_on_function)(), void (*callback_low_off_function)(), 
+                  void (*callback_med_on_function)(), void (*callback_med_off_function)(), 
+                  void (*callback_high_on_function)(), void (*callback_high_off_function)(), 
+                  const char* = "fan");
+
+  protected:
+    void _loop() {
+      Fan::_loop();
+      _off_toggle.switch_loop();
+      _low_toggle.switch_loop();
+      _med_toggle.switch_loop();
+      _high_toggle.switch_loop();
+    }
+
+  private:
+    ToggleInterface_Function _off_toggle;
+    ToggleInterface_Function _low_toggle;
+    ToggleInterface_Function _med_toggle;
+    ToggleInterface_Function _high_toggle;
+
+    bool _setOff() {
+//      Serial.println("Toggle Off");
+      return _off_toggle.toggle();
+    }
+    bool _setLow() {
+//      Serial.println("Toggle Low");
+      return _low_toggle.toggle();
+    }
+    bool _setMed() {
+//      Serial.println("Toggle Med");
+      return _med_toggle.toggle();
+    }
+    bool _setHigh() {
+//      Serial.println("Toggle High");
+      return _high_toggle.toggle();
+    }
+};
+
 #endif

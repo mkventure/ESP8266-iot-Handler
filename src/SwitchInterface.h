@@ -42,6 +42,15 @@ class SwitchInterface_Pin: public SwitchInterface
     int _pin;
 };
 
+class SwitchInterface_Function: public SwitchInterface
+{
+  public:
+    SwitchInterface_Function(void (*callback_on_function)(), void (*callback_off_function)(), bool initialState = false, bool invertOutput = false);
+    bool setState(bool);
+  private:    
+    void (*callback_on_function)();
+    void (*callback_off_function)();
+};
 
 class ToggleInterface: protected SwitchInterface
 {
@@ -62,6 +71,17 @@ class ToggleInterface_Pin : public ToggleInterface
     bool setState(bool);
   private:
     int _pin;
+};
+
+
+class ToggleInterface_Function: public ToggleInterface
+{
+  public:
+    ToggleInterface_Function(void (*callback_on_function)(), void (*callback_off_function)(), bool restingState = RESTING_STATE, unsigned long toggle_time = TOGGLE_TIME);
+    bool setState(bool);
+  private:    
+    void (*callback_on_function)();
+    void (*callback_off_function)();
 };
 
 #endif

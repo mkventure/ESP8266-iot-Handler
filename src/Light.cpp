@@ -69,3 +69,13 @@ bool BinaryLight_TogglePin::_handleAction(String topic, String payload) {
 bool BinaryLight_TogglePin::setHWState(bool state) {
   return lightControl.toggle();
 }
+
+
+
+BinaryLight_Pin::BinaryLight_Pin(IotHandler* handler, const char* mqtt_object_id, int pin, bool initialState, bool invertOutput, const char* mqtt_component)
+  : BinaryLight(handler, mqtt_object_id, initialState, mqtt_component), lightControl(pin, initialState, invertOutput)
+{}
+
+bool BinaryLight_Pin::setHWState(bool state) {
+  return lightControl.setState(state);
+}

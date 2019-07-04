@@ -49,13 +49,31 @@ class BinaryLight_TogglePin : BinaryLight
     //    virtual void _onConnect();
     //    virtual void _setup();
     void _loop() {
-      //      BinaryLight::_loop();
       lightControl.switch_loop();
     }
     bool setHWState(bool);
   private:
     ToggleInterface_Pin lightControl;
     const char* _mqtt_state_invert_payload = STATE_INVERT_PAYLOAD;
+
+};
+
+class BinaryLight_Pin : BinaryLight
+{
+  public:
+    BinaryLight_Pin(IotHandler*, const char*, int pin, bool initital, bool invert, const char* = "light");
+    //    bool setState(bool);
+
+  protected:
+//    virtual bool _handleAction(String topic, String payload);
+    //    virtual void _onConnect();
+    //        void _setup();
+    void _loop() {
+      lightControl.switch_loop();
+    }
+    bool setHWState(bool);
+  private:
+    SwitchInterface_Pin lightControl;
 
 };
 

@@ -9,14 +9,15 @@
 
 // MQTT Parameters
 #define MQTT_BROKER SECRET_MQTT_BROKER
+#define MQTT_PORT 1883
 #define MQTT_USERNAME SECRET_MQTT_USERNAME
 #define MQTT_PASSWORD SECRET_MQTT_PASSWORD
-#define MQTT_CLIENTID "GARAGE"
+#define MQTT_NODE_ID "GARAGE"
+#define MQTT_DISCOVERY_PREFIX "homeassistant"
 
 // Module Config
 #define TOGGLE_PIN 5
 #define REED_SWITCH_PIN 4
-
 
 /* YAML Configuration
 
